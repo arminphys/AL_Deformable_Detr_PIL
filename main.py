@@ -152,7 +152,7 @@ def main(args):
                 out = True
                 break
         return out
-
+    
     model, processors = build(args,dataset_train,dataset_val)
     print(model) 
     """
@@ -178,8 +178,9 @@ def main(args):
         coco_val = datasets.coco.build("val", args)
         base_ds = get_coco_api_from_dataset(coco_val)
     else:
-        base_ds = get_coco_api_from_dataset(dataset_val)
-
+    
+    base_ds = get_coco_api_from_dataset(dataset_val)
+    
     if args.frozen_weights is not None:
         checkpoint = torch.load(args.frozen_weights, map_location='cpu')
         model_without_ddp.detr.load_state_dict(checkpoint['model'])
@@ -191,7 +192,8 @@ def main(args):
 
     print("Start training")
     start_time = time.time()
-    trainer = pil.Trainer(gpus=-1)
+#    trainer = pil.Trainer(gpus=-1)
+    trainer = pil.Trainer()
     trainer.fit(model) 
 
     total_time = time.time() - start_time

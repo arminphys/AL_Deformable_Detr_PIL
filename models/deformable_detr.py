@@ -32,7 +32,7 @@ from torch.utils.data import DataLoader
 import util.misc as utils 
 from datasets.coco_eval import CocoEvaluator
 from pathlib import Path 
-
+from datasets import build_dataset, get_coco_api_from_dataset
 
 def match_name_keywords(n, name_keywords):
         out = False
@@ -51,7 +51,7 @@ class DeformableDETR(pl.LightningModule):
     """ This is the Deformable DETR module that performs object detection """
     def __init__(self, backbone, transformer, num_classes, num_queries, num_feature_levels,
                  aux_loss=True, with_box_refine=False, two_stage=False,batch_sampler_train=None,val_sampler=None,
-                 num_workers=2,args=None,param_dicts=None,dataset_train=None,dataset_val=None,dataset_test=None,postprocessors=None):
+                 num_workers=2,args=None,param_dicts=None,dataset_train=None,dataset_val=None,dataset_test=None,postprocessors=None, base_ds=None):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -80,7 +80,8 @@ class DeformableDETR(pl.LightningModule):
         self.postprocessors = postprocessors
         self.num_queries = num_queries
         self.transformer = transformer
-        self.base_ds = path.path("/home/cedric/Deep-Learning/Transformers/DEFOR-DETR/data/coco") #dataset path 
+        self.base_ds = get_coco_api_from_dataset(dataset_val)
+
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes)
         self.batch_size = 8 
@@ -230,6 +231,7 @@ class DeformableDETR(pl.LightningModule):
         weight_dict = self.criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
         loss = losses 
+        loss_dict_reduced = utils.reduce_dict(loss_dict)
         if not math.isfinite(losses):
             print("Loss is {}, stopping training".format(losses))
             print(loss_dict_reduced)
@@ -285,6 +287,7 @@ class DeformableDETR(pl.LightningModule):
         self.metric_logger.update(loss=sum(loss_dict_reduced_scaled.values()),
                              **loss_dict_reduced_scaled,
                              **loss_dict_reduced_unscaled)
+        loss_dict_reduced = utils.reduce_dict(loss_dict)
         self.metric_logger.update(class_error=loss_dict_reduced['class_error'])
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
@@ -304,9 +307,10 @@ class DeformableDETR(pl.LightningModule):
             self.coco_evaluator.accumulate()
             self.coco_evaluator.summarize()
         self.tats = {k: meter.global_avg for k, meter in self.metric_logger.meters.items()}
-        if coco_evaluator is not None:
+        if self.coco_evaluator is not None:
             if 'bbox' in self.postprocessors.keys():
-                self.stats['coco_eval_bbox'] = self.coco_evaluator.coco_eval['bbox'].stats.tolist()
+                pass
+                #self.stats['coco_eval_bbox'] = self.coco_evaluator.coco_eval['bbox'].stats.tolist()
      
 
     def train_dataloader(self): 
